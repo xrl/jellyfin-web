@@ -42,8 +42,12 @@ function getBaseProfileOptions(item) {
         }
     }
 
+    // Modern Chromium, Firefox, Safari/WebKit and WebOS/Tizen browsers can play MKV
+    // containers progressively; the previous conservative `false` default forced
+    // non-Chrome browsers to remux to HLS-TS, which strips HDR10+ dynamic metadata.
+    // See jellyfin-webos PR #325, jellyfin-webos issue #159, jellyfin issue #11794.
     return {
-        enableMkvProgressive: false,
+        enableMkvProgressive: true,
         disableHlsVideoAudioCodecs: disableHlsVideoAudioCodecs
     };
 }
