@@ -1,0 +1,46 @@
+name: Release 🏷️
+
+on:
+  push:
+    tags:
+      - 'v*-xrl.*'   # e.g. v10.11.5-xrl.1
+
+permissions:
+  contents: write   # required to create releases
+
+jobs:
+  build-and-release:
+    name: Build bundle and publish release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup node environment
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          check-latest: true
+
+      - name: Install Node.js dependencies
+        run: npm ci --no-audit
+
+      - name: Run a production build
+        env:
+          JELLYFIN_VERSION: ${{ github.ref_name }}
+        run: npm run build:production
+
+      - name: Tar dist
+        run: tar -czf jellyfin-web-dist.tar.gz -C dist .
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "${GITHUB_REF_NAME}" \
+            --notes "Built jellyfin-web bundle. Tracks upstream tag derived from this fork's commit." \
+            jellyfin-web-dist.tar.gz
