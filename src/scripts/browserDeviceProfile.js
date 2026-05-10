@@ -1195,7 +1195,10 @@ export default function (options) {
         vp9VideoRangeTypes += '|HDR10|HDR10Plus';
         av1VideoRangeTypes += '|HDR10|HDR10Plus';
 
-        if (browser.tizenVersion >= 3 || browser.vidaa) {
+        // LG WebOS browser supports DV+HDR10+ via the same DOVIWithHDR10Plus video
+        // range type as Tizen. Adding WebOS to the allowance lets these tracks
+        // direct-play instead of being transcoded with HDR10+ metadata stripped.
+        if (browser.tizenVersion >= 3 || browser.vidaa || browser.web0s) {
             // Tizen TV does not support Dolby Vision at all, but it can safely play the HDR fallback.
             // Advertising the support so that the server doesn't have to remux.
             hevcVideoRangeTypes += '|DOVIWithHDR10|DOVIWithHDR10Plus|DOVIWithEL|DOVIWithELHDR10Plus|DOVIInvalid';
