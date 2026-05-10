@@ -162,7 +162,10 @@ export class UserSettings {
         }
 
         // Enable it by default only for the platforms that play fMP4 for sure.
-        return toBoolean(this.get('preferFmp4HlsContainer', false), browser.safari || browser.firefox || browser.chrome || browser.edgeChromium);
+        // WebOS (LG C2 and similar) handles fMP4/CMAF HLS more reliably than MPEG-TS for 4K HEVC
+        // + Dolby Vision: mpegts strips DV RPU side data and HDR10+ metadata, causing stutter and
+        // HDR pipeline confusion. fMP4/CMAF preserves the DV signaling intact.
+        return toBoolean(this.get('preferFmp4HlsContainer', false), browser.safari || browser.firefox || browser.chrome || browser.edgeChromium || browser.web0s);
     }
 
     /**
