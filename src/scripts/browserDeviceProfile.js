@@ -110,21 +110,21 @@ function supportsAc3(videoTestElement) {
 
 /**
  * Checks if the device supports DTS (DCA).
- * @param {HTMLVideoElement} videoTestElement The video test element
- * @returns {boolean|null} _true_ if the device supports DTS (DCA). _false_ if the device doesn't support DTS (DCA). _null_ if support status is unknown.
+ * @returns {boolean} _false_ -- DTS support is never auto-detected. Callers should rely
+ * on the explicit `appSettings.enableDts()` preference or `options.supportsDts` flag.
  */
-function canPlayDts(videoTestElement) {
-    // DTS audio is not supported by Samsung TV 2018+ (Tizen 4.0+) and LG TV 2020-2022 (webOS 5.0, 6.0 and 22) models
-    if (browser.tizenVersion >= 4 || (browser.web0sVersion >= 5 && browser.web0sVersion < 23)) {
-        return false;
-    }
-
-    if (videoTestElement.canPlayType('video/mp4; codecs="dts-"').replace(/no/, '')
-        || videoTestElement.canPlayType('video/mp4; codecs="dts+"').replace(/no/, '')) {
-        return true;
-    }
-
-    return null;
+function canPlayDts() {
+    // We do NOT trust HTMLVideoElement.canPlayType() for DTS:
+    // no mainstream browser ships a software DTS decoder, yet some platforms
+    // (notably LG webOS's built-in browser) still return a truthy value for
+    // `canPlayType('video/mp4; codecs="dts+"')`. LG dropped DTS decoding from
+    // their TVs starting with the C9/CX (2019+) generation -- the panel can
+    // only bitstream DTS over HDMI, not decode it -- so when the web client
+    // advertises DTS support the server muxes DTS straight through and the
+    // user gets video with silent audio. Users on platforms that genuinely
+    // can play DTS (e.g. via HDMI passthrough) can still opt in via the
+    // appSettings.enableDts() preference or the options.supportsDts flag.
+    return false;
 }
 
 function supportsEac3(videoTestElement) {
@@ -614,7 +614,7 @@ export default function (options) {
 
     let supportsDts = appSettings.enableDts() || options.supportsDts;
     if (supportsDts == null) {
-        supportsDts = canPlayDts(videoTestElement);
+        supportsDts = canPlayDts();
     }
 
     if (supportsDts) {
