@@ -13,6 +13,7 @@ const BrowserName = {
     tizen: 'Samsung Smart TV',
     web0s: 'LG Smart TV',
     titanos: 'Titan OS',
+    vega: 'Vega OS',
     operaTv: 'Opera TV',
     xboxOne: 'Xbox One',
     ps4: 'Sony PS4',
@@ -40,8 +41,6 @@ function getBaseProfileOptions(item) {
         }
     }
 
-    // Note: enableMkvProgressive is set to false (upstream default) because the option is
-    // never read by browserDeviceProfile.js in this build — setting it true was a no-op.
     return {
         enableMkvProgressive: false,
         disableHlsVideoAudioCodecs: disableHlsVideoAudioCodecs
@@ -457,5 +456,3 @@ if (window.addEventListener) {
     window.addEventListener('blur', onAppHidden);
 }
 
-// load app host on module load
-appHost.init();

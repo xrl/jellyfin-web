@@ -28,6 +28,11 @@ function canPlayAv1(videoTestElement) {
         return true;
     }
 
+    if (browser.xboxOne) {
+        // webview2 on xbox may falsely report AV1 as supported
+        return false;
+    }
+
     // av1 main level 5.3
     return !!videoTestElement.canPlayType
         && (videoTestElement.canPlayType('video/mp4; codecs="av01.0.15M.08"').replace(/no/, '')
@@ -173,6 +178,9 @@ function canPlayAudioFormat(format) {
         if (browser.web0s) {
             // canPlayType lies about OPUS support
             return browser.web0sVersion >= 3.5;
+        } else if (browser.xboxOne) {
+            // webview2 on xbox may falsely report OPUS as supported
+            return false;
         }
 
         typeString = 'audio/ogg; codecs="opus"';
@@ -831,6 +839,12 @@ export default function (options) {
         enableFmp4Hls = false;
     }
 
+    // fMP4 in Firefox 149 is largely broken due to bad moof::traf::tfdt handling
+    // https://bugzilla.mozilla.org/show_bug.cgi?id=2026875
+    if (browser.firefox && browser.versionMajor == 149) {
+        enableFmp4Hls = false;
+    }
+
     if (canPlayHls() && browser.enableHlsAudio !== false) {
         profile.TranscodingProfiles.push({
             Container: enableFmp4Hls ? 'mp4' : 'ts',
@@ -1185,7 +1199,9 @@ export default function (options) {
     let vp9VideoRangeTypes = 'SDR';
     let av1VideoRangeTypes = 'SDR';
 
-    if (browser.tizenVersion >= 3) {
+    const isWebOsWithoutDolbyVision = browser.web0s && !supportsDolbyVision(options);
+
+    if (browser.tizenVersion >= 3 || isWebOsWithoutDolbyVision) {
         hevcVideoRangeTypes += '|DOVIWithSDR';
     }
 
@@ -1195,11 +1211,12 @@ export default function (options) {
         vp9VideoRangeTypes += '|HDR10|HDR10Plus';
         av1VideoRangeTypes += '|HDR10|HDR10Plus';
 
-        // LG WebOS browser supports DV+HDR10+ via the same DOVIWithHDR10Plus video
-        // range type as Tizen. Adding WebOS to the allowance lets these tracks
-        // direct-play instead of being transcoded with HDR10+ metadata stripped.
+        // LG webOS can play the HDR fallback regardless of whether the panel reports
+        // Dolby Vision support. Advertising these range types avoids unnecessary
+        // transcoding that would strip HDR10+ dynamic metadata.
         if (browser.tizenVersion >= 3 || browser.vidaa || browser.web0s) {
             // Tizen TV does not support Dolby Vision at all, but it can safely play the HDR fallback.
+            // LG TVs can also play the HDR fallback without issues.
             // Advertising the support so that the server doesn't have to remux.
             hevcVideoRangeTypes += '|DOVIWithHDR10|DOVIWithHDR10Plus|DOVIWithEL|DOVIWithELHDR10Plus|DOVIInvalid';
             // Although no official tools exist to create AV1+DV files yet, some of our users managed to use community tools to create such files.
@@ -1213,7 +1230,7 @@ export default function (options) {
         vp9VideoRangeTypes += '|HLG';
         av1VideoRangeTypes += '|HLG';
 
-        if (browser.tizenVersion >= 3) {
+        if (browser.tizenVersion >= 3 || isWebOsWithoutDolbyVision) {
             hevcVideoRangeTypes += '|DOVIWithHLG';
         }
     }
