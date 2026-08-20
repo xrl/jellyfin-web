@@ -191,6 +191,11 @@ export function getListViewHtml(options) {
     for (let i = 0, length = items.length; i < length; i++) {
         const item = items[i];
 
+        const safeOverviewHtml = item.Overview ?
+            // eslint-disable-next-line sonarjs/disabled-auto-escaping
+            DOMPurify.sanitize(markdownIt({ html: true }).render(item.Overview)) :
+            '';
+
         let html = '';
 
         if (options.showIndex) {
@@ -298,7 +303,7 @@ export function getListViewHtml(options) {
             }
 
             if (playOnImageClick) {
-                html += '<button is="paper-icon-button-light" class="listItemImageButton itemAction" data-action="resume"><span class="material-icons listItemImageButton-icon play_arrow" aria-hidden="true"></span></button>';
+                html += `<button is="paper-icon-button-light" class="listItemImageButton itemAction" data-action="resume" title="${globalize.translate('Play')}"><span class="material-icons listItemImageButton-icon play_arrow" aria-hidden="true"></span></button>`;
             }
 
             const progressHtml = indicators.getProgressBarHtml(item, {
@@ -416,11 +421,9 @@ export function getListViewHtml(options) {
             html += '</div>';
         }
 
-        if (enableOverview && item.Overview) {
-            // eslint-disable-next-line sonarjs/disabled-auto-escaping
-            const overview = DOMPurify.sanitize(markdownIt({ html: true }).render(item.Overview || ''));
+        if (enableOverview && safeOverviewHtml) {
             html += '<div class="secondary listItem-overview listItemBodyText">';
-            html += '<bdi>' + overview + '</bdi>';
+            html += `<bdi>${safeOverviewHtml}</bdi>`;
             html += '</div>';
         }
 
@@ -449,11 +452,11 @@ export function getListViewHtml(options) {
 
         if (!clickEntireItem) {
             if (options.addToListButton) {
-                html += '<button is="paper-icon-button-light" class="listItemButton itemAction" data-action="addtoplaylist"><span class="material-icons playlist_add" aria-hidden="true"></span></button>';
+                html += `<button is="paper-icon-button-light" class="listItemButton itemAction" data-action="addtoplaylist" title="${globalize.translate('AddToPlaylist')}"><span class="material-icons playlist_add" aria-hidden="true"></span></button>`;
             }
 
             if (options.infoButton) {
-                html += '<button is="paper-icon-button-light" class="listItemButton itemAction" data-action="link"><span class="material-icons info_outline" aria-hidden="true"></span></button>';
+                html += `<button is="paper-icon-button-light" class="listItemButton itemAction" data-action="link" title="${globalize.translate('ButtonInfo')}"><span class="material-icons info_outline" aria-hidden="true"></span></button>`;
             }
 
             if (options.rightButtons) {
@@ -474,7 +477,7 @@ export function getListViewHtml(options) {
             }
 
             if (options.moreButton !== false) {
-                html += '<button is="paper-icon-button-light" class="listItemButton itemAction" data-action="menu"><span class="material-icons more_vert" aria-hidden="true"></span></button>';
+                html += `<button is="paper-icon-button-light" class="listItemButton itemAction" data-action="menu" title="${globalize.translate('ButtonMore')}"><span class="material-icons more_vert" aria-hidden="true"></span></button>`;
             }
         }
         html += '</div>';
@@ -482,9 +485,9 @@ export function getListViewHtml(options) {
         if (enableContentWrapper) {
             html += '</div>';
 
-            if (enableOverview && item.Overview) {
+            if (enableOverview && safeOverviewHtml) {
                 html += '<div class="listItem-bottomoverview secondary">';
-                html += '<bdi>' + item.Overview + '</bdi>';
+                html += `<bdi>${safeOverviewHtml}</bdi>`;
                 html += '</div>';
             }
         }
@@ -498,5 +501,5 @@ export function getListViewHtml(options) {
 }
 
 export default {
-    getListViewHtml: getListViewHtml
+    getListViewHtml
 };
