@@ -3562,6 +3562,23 @@ export class PlaybackManager {
             sendProgressUpdate(player, 'unpause');
         }
 
+        function onNativeHlsStall(e, details) {
+            const player = this;
+            const playerData = getPlayerData(player);
+            const streamInfo = playerData.streamInfo;
+
+            if (playerData.isChangingStream || !streamInfo?.url?.toLowerCase().includes('.m3u8')) {
+                return;
+            }
+
+            const startTime = getCurrentTicks(player)
+                || ((details?.positionMs || 0) * 10000)
+                || streamInfo.playerStartPositionTicks
+                || 0;
+            console.warn(`[playbackmanager] Restarting stalled native HLS stream at ${startTime} ticks`);
+            changeStream(player, startTime, {});
+        }
+
         function onPlaybackVolumeChange() {
             const player = this;
             sendProgressUpdate(player, 'volumechange');
@@ -3626,6 +3643,7 @@ export class PlaybackManager {
                 Events.on(player, 'timeupdate', onPlaybackTimeUpdate);
                 Events.on(player, 'pause', onPlaybackPause);
                 Events.on(player, 'unpause', onPlaybackUnpause);
+                Events.on(player, 'nativehlsstall', onNativeHlsStall);
                 Events.on(player, 'volumechange', onPlaybackVolumeChange);
                 Events.on(player, 'repeatmodechange', onRepeatModeChange);
                 Events.on(player, 'shufflequeuemodechange', onShuffleQueueModeChange);
