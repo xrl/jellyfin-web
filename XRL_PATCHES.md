@@ -2,6 +2,12 @@
 
 This fork publishes patched production bundles for the LG webOS client used by the XRL homelab. Release tags use the form `v<upstream-version>-xrl.<revision>` and are based on the matching upstream Jellyfin Web tag.
 
+## `v10.11.11-xrl.2`
+
+Base: [`jellyfin/jellyfin-web@v10.11.11`](https://github.com/jellyfin/jellyfin-web/releases/tag/v10.11.11)
+
+Carries the `xrl.1` playback changes below plus **bounded native-HLS stall recovery for webOS**. The LG native HLS player can stop requesting segments without raising a media error ([jellyfin-webos#327](https://github.com/jellyfin/jellyfin-webos/issues/327)). While an unpaused native HLS stream is not advancing, the player now recreates the server stream after 12 seconds. Recovery is limited to three attempts in ten minutes with a 30-second cooldown, preventing the existing unbounded FFmpeg restart-loop failure mode.
+
 ## `v10.11.11-xrl.1`
 
 Base: [`jellyfin/jellyfin-web@v10.11.11`](https://github.com/jellyfin/jellyfin-web/releases/tag/v10.11.11)
