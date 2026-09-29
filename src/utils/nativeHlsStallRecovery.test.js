@@ -77,6 +77,14 @@ describe('NativeHlsStallRecovery', () => {
         expect(recovery.tryRecovery(612_001)).toBe(true);
     });
 
+    it('does not postpone recovery across repeated waiting/playing with unchanged time', () => {
+        const recovery = new NativeHlsStallRecovery();
+        recovery.markPlaybackActive(15, 0); // play event
+        recovery.markPlaying(15, 5_000); // playing after waiting, no advancement
+        recovery.markPlaying(15, 11_000);
+        expect(recovery.tryRecovery(12_000)).toBe(true);
+    });
+
     it('retains the same-item budget when playback restarts at the recovered position', () => {
         const recovery = new NativeHlsStallRecovery();
         recovery.markPlaybackActive(15, 0);

@@ -41,6 +41,17 @@ export class NativeHlsStallRecovery {
         this.#lastProgressAt = now;
     }
 
+    // `playing` may fire repeatedly after buffering without actual media progress.
+    // Only initialize a new clock when playback had not started; a true resume
+    // from pause explicitly calls markPlaybackActive instead.
+    markPlaying(mediaTime, now = Date.now()) {
+        if (this.#lastProgressAt === undefined) {
+            this.markPlaybackActive(mediaTime, now);
+        } else {
+            this.observeProgress(mediaTime, now);
+        }
+    }
+
     observeProgress(mediaTime, now = Date.now()) {
         if (!Number.isFinite(mediaTime)) return;
 

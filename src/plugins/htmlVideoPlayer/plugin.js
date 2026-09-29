@@ -44,7 +44,7 @@ import { setBackdropTransparency, TRANSPARENCY_LEVEL } from '../../components/ba
 import Events from '../../utils/events.ts';
 import { includesAny } from '../../utils/container.ts';
 import { isHls } from '../../utils/mediaSource.ts';
-import { NativeHlsStallRecovery } from '../../utils/nativeHlsStallRecovery';
+import { NativeHlsStallWatchdog } from '../../utils/nativeHlsStallWatchdog';
 
 const NATIVE_UNSUPPORTED_SUBTITLE_CODECS = ['ssa', 'ass', 'pgssub', 'dvdsub', 'vobsub'];
 const ASS_SUBTITLE_CODECS = ['ssa', 'ass'];
@@ -230,7 +230,6 @@ const PRIMARY_TEXT_TRACK_INDEX = 0;
 const VOBSUB_DEBAND_THRESHOLD = 64;
 const VOBSUB_DEBAND_RANGE = 15;
 const SECONDARY_TEXT_TRACK_INDEX = 1;
-const NATIVE_HLS_STALL_CHECK_INTERVAL_MS = 2_000;
 
 export class HtmlVideoPlayer {
     /**
@@ -347,14 +346,14 @@ export class HtmlVideoPlayer {
      * @type {number | null | undefined}
      */
     #currentTime;
-    /**
-     * @type {NativeHlsStallRecovery}
-     */
-    #nativeHlsStallRecovery = new NativeHlsStallRecovery();
-    /**
-     * @type {ReturnType<typeof setInterval> | undefined}
-     */
-    #nativeHlsStallWatchdog;
+    #nativeHlsStallWatchdog = new NativeHlsStallWatchdog({
+        isRecoverable: () => this.#isRecoverableNativeHls(),
+        getMediaElement: () => this.#mediaElement,
+        onStall: details => {
+            console.warn(`[htmlvideoplayer] Recreating stalled webOS native HLS stream: ${JSON.stringify(details)}`);
+            Events.trigger(this, 'nativehlsstall', [details]);
+        }
+    });
 
     /**
      * @private (used in other files)
@@ -515,65 +514,8 @@ export class HtmlVideoPlayer {
             && this.#currentSrc?.toLowerCase().includes('.m3u8');
     }
 
-    #stopNativeHlsStallWatchdog() {
-        if (this.#nativeHlsStallWatchdog) {
-            clearInterval(this.#nativeHlsStallWatchdog);
-            this.#nativeHlsStallWatchdog = undefined;
-        }
-    }
-
-    #startNativeHlsStallWatchdog(elem, resetProgress) {
-        if (!this.#isRecoverableNativeHls()) return;
-
-        if (resetProgress) {
-            this.#nativeHlsStallRecovery.markPlaybackActive(elem.currentTime);
-        }
-
-        if (!this.#nativeHlsStallWatchdog) {
-            this.#nativeHlsStallWatchdog = setInterval(
-                () => this.#checkNativeHlsStall(),
-                NATIVE_HLS_STALL_CHECK_INTERVAL_MS
-            );
-        }
-    }
-
-    #checkNativeHlsStall() {
-        const elem = this.#mediaElement;
-        if (!elem
-            || !this.#isRecoverableNativeHls()
-            || elem.paused
-            || elem.ended
-            || elem.seeking
-        ) {
-            return;
-        }
-
-        const mediaTime = elem.currentTime;
-        this.#nativeHlsStallRecovery.observeProgress(mediaTime);
-
-        if (!this.#nativeHlsStallRecovery.tryRecovery()) return;
-
-        const bufferedRanges = [];
-        for (let i = 0; i < elem.buffered.length; i++) {
-            bufferedRanges.push([elem.buffered.start(i), elem.buffered.end(i)]);
-        }
-
-        const details = {
-            positionMs: Math.round(mediaTime * 1_000),
-            readyState: elem.readyState,
-            networkState: elem.networkState,
-            bufferedRanges
-        };
-        console.warn(`[htmlvideoplayer] Recreating stalled webOS native HLS stream: ${JSON.stringify(details)}`);
-        Events.trigger(this, 'nativehlsstall', [details]);
-    }
-
     async play(options) {
-        const previousItemId = this._currentPlayOptions?.item?.Id;
-        if (!previousItemId || previousItemId !== options.item?.Id) {
-            this.#nativeHlsStallRecovery.reset();
-        }
-        this.#stopNativeHlsStallWatchdog();
+        this.#nativeHlsStallWatchdog.play(this._currentPlayOptions?.item?.Id, options.item?.Id);
 
         this.#started = false;
         this.#timeUpdated = false;
@@ -1015,8 +957,7 @@ export class HtmlVideoPlayer {
     }
 
     stop(destroyPlayer) {
-        this.#stopNativeHlsStallWatchdog();
-        this.#nativeHlsStallRecovery.reset();
+        this.#nativeHlsStallWatchdog.stop(true);
 
         const elem = this.#mediaElement;
         const src = this.#currentSrc;
@@ -1040,8 +981,7 @@ export class HtmlVideoPlayer {
 
     destroy() {
         this.setSubtitleOffset.cancel();
-        this.#stopNativeHlsStallWatchdog();
-        this.#nativeHlsStallRecovery.reset();
+        this.#nativeHlsStallWatchdog.stop(true);
 
         destroyHlsPlayer(this);
         destroyFlvPlayer(this);
@@ -1095,8 +1035,7 @@ export class HtmlVideoPlayer {
          * @type {HTMLMediaElement}
          */
         const elem = e.target;
-        this.#stopNativeHlsStallWatchdog();
-        this.#nativeHlsStallRecovery.reset();
+        this.#nativeHlsStallWatchdog.stop(true);
         this.destroyCustomTrack(elem);
         onEndedInternal(this, elem, this.onError);
     };
@@ -1119,7 +1058,7 @@ export class HtmlVideoPlayer {
         }
 
         this.#currentTime = time;
-        this.#nativeHlsStallRecovery.observeProgress(time);
+        this.#nativeHlsStallWatchdog.observeProgress(time);
 
         const currentPlayOptions = this._currentPlayOptions;
         // Not sure yet how this is coming up null since we never null it out, but it is causing app crashes
@@ -1188,7 +1127,7 @@ export class HtmlVideoPlayer {
          * @type {HTMLMediaElement}
          */
         const elem = e.target;
-        this.#startNativeHlsStallWatchdog(elem, true);
+        this.#nativeHlsStallWatchdog.start(elem, 'playing');
 
         if (!this.#started) {
             this.#started = true;
@@ -1225,7 +1164,7 @@ export class HtmlVideoPlayer {
      * @private
      */
     onPlay = (e) => {
-        this.#startNativeHlsStallWatchdog(e.target, true);
+        this.#nativeHlsStallWatchdog.start(e.target, 'play');
         Events.trigger(this, 'unpause');
     };
 
@@ -1266,17 +1205,17 @@ export class HtmlVideoPlayer {
      * @private
      */
     onPause = () => {
-        this.#stopNativeHlsStallWatchdog();
+        this.#nativeHlsStallWatchdog.pause();
         Events.trigger(this, 'pause');
     };
 
     onWaiting = (e) => {
-        this.#startNativeHlsStallWatchdog(e.target, false);
+        this.#nativeHlsStallWatchdog.start(e.target, 'waiting');
         Events.trigger(this, 'waiting');
     };
 
     onStalled = (e) => {
-        this.#startNativeHlsStallWatchdog(e.target, false);
+        this.#nativeHlsStallWatchdog.start(e.target, 'waiting');
         Events.trigger(this, 'waiting');
     };
 
@@ -1289,7 +1228,7 @@ export class HtmlVideoPlayer {
          * @type {HTMLMediaElement}
          */
         const elem = e.target;
-        this.#stopNativeHlsStallWatchdog();
+        this.#nativeHlsStallWatchdog.stop();
         const errorCode = elem.error ? (elem.error.code || 0) : 0;
         const errorMessage = elem.error ? (elem.error.message || '') : '';
         console.error(`media element error: ${errorCode} ${errorMessage}`);
