@@ -17,9 +17,12 @@ export class NativeHlsStallWatchdog {
 
     play(previousItemId, itemId) {
         this.stop();
+        // A recreated stream needs its own 12-second progress clock even if
+        // resolving it took longer than the cooldown. Keep the attempt budget
+        // for continuous playback of the same item.
+        this.#paused = true;
         if (!previousItemId || previousItemId !== itemId) {
             this.#recovery.reset();
-            this.#paused = true;
         }
     }
 

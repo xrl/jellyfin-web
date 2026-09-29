@@ -72,6 +72,36 @@ describe('native HLS player watchdog lifecycle', () => {
         watchdog.stop(true);
     });
 
+    it('allows a delayed same-item recreation 12 seconds to advance without clearing the budget', () => {
+        const elem = mediaElement();
+        const onStall = vi.fn();
+        const watchdog = createWatchdog(elem, onStall);
+        watchdog.play(undefined, 'item-a');
+        watchdog.start(elem, 'play');
+        vi.advanceTimersByTime(12_000);
+        expect(onStall).toHaveBeenCalledTimes(1);
+
+        watchdog.play('item-a', 'item-a');
+        expect(vi.getTimerCount()).toBe(0);
+        vi.advanceTimersByTime(40_000); // stream negotiation exceeds 30s cooldown
+        watchdog.start(elem, 'playing'); // same media position, new stream
+        vi.advanceTimersByTime(11_999);
+        expect(onStall).toHaveBeenCalledTimes(1);
+        vi.advanceTimersByTime(1);
+        expect(onStall).toHaveBeenCalledTimes(2);
+        watchdog.play('item-a', 'item-a');
+        vi.advanceTimersByTime(40_000);
+        watchdog.start(elem, 'playing');
+        vi.advanceTimersByTime(12_000);
+        expect(onStall).toHaveBeenCalledTimes(3);
+        watchdog.play('item-a', 'item-a');
+        vi.advanceTimersByTime(40_000);
+        watchdog.start(elem, 'playing');
+        vi.advanceTimersByTime(12_000);
+        expect(onStall).toHaveBeenCalledTimes(3); // fourth attempt denied in rolling 10 min
+        watchdog.stop(true);
+    });
+
     it('stops polling on pause/end/error/destroy, excludes seek and genuine resume restarts clock', () => {
         const elem = mediaElement();
         const onStall = vi.fn();
