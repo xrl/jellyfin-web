@@ -6,6 +6,7 @@ import { StillWatchingOptions } from 'plugins/stillWatching/constants';
 import Events from 'utils/events';
 import { queryClient } from 'utils/query/queryClient';
 import { toBoolean } from 'utils/string';
+import { defaultPreferFmp4HlsContainer } from 'utils/webOsPlaybackPreferences';
 
 import browser from '../browser';
 import appSettings from './appSettings';
@@ -184,7 +185,7 @@ export class UserSettings {
         // WebOS (LG C2 and similar) handles fMP4/CMAF HLS more reliably than MPEG-TS for 4K HEVC
         // + Dolby Vision: mpegts strips DV RPU side data and HDR10+ metadata, causing stutter and
         // HDR pipeline confusion. fMP4/CMAF preserves the DV signaling intact.
-        return toBoolean(this.get('preferFmp4HlsContainer', false), browser.safari || browser.firefox || browser.chrome || browser.edgeChromium || browser.web0s);
+        return toBoolean(this.get('preferFmp4HlsContainer', false), defaultPreferFmp4HlsContainer(browser));
     }
 
     /**

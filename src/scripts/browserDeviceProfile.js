@@ -1,6 +1,7 @@
 import browser from './browser';
 import appSettings from './settings/appSettings';
 import * as userSettings from './settings/userSettings';
+import { allowHdrFallbackRanges, supportsDts as resolveDtsSupport } from '../utils/webOsPlaybackPreferences';
 
 function canPlayH264(videoTestElement) {
     return !!(videoTestElement.canPlayType?.('video/mp4; codecs="avc1.42E01E, mp4a.40.2"').replace(/no/, ''));
@@ -106,25 +107,6 @@ function supportsAc3(videoTestElement) {
     }
 
     return videoTestElement.canPlayType('audio/mp4; codecs="ac-3"').replace(/no/, '');
-}
-
-/**
- * Checks if the device supports DTS (DCA).
- * @returns {boolean} _false_ -- DTS support is never auto-detected. Callers should rely
- * on the explicit `appSettings.enableDts()` preference or `options.supportsDts` flag.
- */
-function canPlayDts() {
-    // We do NOT trust HTMLVideoElement.canPlayType() for DTS:
-    // no mainstream browser ships a software DTS decoder, yet some platforms
-    // (notably LG webOS's built-in browser) still return a truthy value for
-    // `canPlayType('video/mp4; codecs="dts+"')`. LG dropped DTS decoding from
-    // their TVs starting with the C9/CX (2019+) generation -- the panel can
-    // only bitstream DTS over HDMI, not decode it -- so when the web client
-    // advertises DTS support the server muxes DTS straight through and the
-    // user gets video with silent audio. Users on platforms that genuinely
-    // can play DTS (e.g. via HDMI passthrough) can still opt in via the
-    // appSettings.enableDts() preference or the options.supportsDts flag.
-    return false;
 }
 
 function supportsEac3(videoTestElement) {
@@ -612,10 +594,7 @@ export default function (options) {
         hlsInFmp4VideoAudioCodecs.push('mp2');
     }
 
-    let supportsDts = appSettings.enableDts() || options.supportsDts;
-    if (supportsDts == null) {
-        supportsDts = canPlayDts();
-    }
+    const supportsDts = resolveDtsSupport(appSettings.enableDts(), options.supportsDts);
 
     if (supportsDts) {
         videoAudioCodecs.push('dca');
@@ -1231,7 +1210,7 @@ export default function (options) {
         // LG webOS can play the HDR fallback regardless of whether the panel reports
         // Dolby Vision support. Advertising these range types avoids unnecessary
         // transcoding that would strip HDR10+ dynamic metadata.
-        if (browser.tizenVersion >= 3 || browser.vidaa || browser.web0s) {
+        if (allowHdrFallbackRanges(browser)) {
             // Tizen TV does not support Dolby Vision at all, but it can safely play the HDR fallback.
             // LG TVs can also play the HDR fallback without issues.
             // Advertising the support so that the server doesn't have to remux.
