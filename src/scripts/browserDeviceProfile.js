@@ -1,6 +1,7 @@
 import browser from './browser';
 import appSettings from './settings/appSettings';
 import * as userSettings from './settings/userSettings';
+import { allowHdrFallbackRanges, supportsDts as resolveDtsSupport } from '../utils/webOsPlaybackPreferences';
 
 function canPlayH264(videoTestElement) {
     return !!(videoTestElement.canPlayType?.('video/mp4; codecs="avc1.42E01E, mp4a.40.2"').replace(/no/, ''));
@@ -106,25 +107,6 @@ function supportsAc3(videoTestElement) {
     }
 
     return videoTestElement.canPlayType('audio/mp4; codecs="ac-3"').replace(/no/, '');
-}
-
-/**
- * Checks if the device supports DTS (DCA).
- * @param {HTMLVideoElement} videoTestElement The video test element
- * @returns {boolean|null} _true_ if the device supports DTS (DCA). _false_ if the device doesn't support DTS (DCA). _null_ if support status is unknown.
- */
-function canPlayDts(videoTestElement) {
-    // DTS audio is not supported by Samsung TV 2018+ (Tizen 4.0+) and LG TV 2020-2022 (webOS 5.0, 6.0 and 22) models
-    if (browser.tizenVersion >= 4 || (browser.web0sVersion >= 5 && browser.web0sVersion < 23)) {
-        return false;
-    }
-
-    if (videoTestElement.canPlayType('video/mp4; codecs="dts-"').replace(/no/, '')
-        || videoTestElement.canPlayType('video/mp4; codecs="dts+"').replace(/no/, '')) {
-        return true;
-    }
-
-    return null;
 }
 
 function supportsEac3(videoTestElement) {
@@ -612,10 +594,7 @@ export default function (options) {
         hlsInFmp4VideoAudioCodecs.push('mp2');
     }
 
-    let supportsDts = appSettings.enableDts() || options.supportsDts;
-    if (supportsDts == null) {
-        supportsDts = canPlayDts(videoTestElement);
-    }
+    const supportsDts = resolveDtsSupport(appSettings.enableDts(), options.supportsDts);
 
     if (supportsDts) {
         videoAudioCodecs.push('dca');
@@ -853,6 +832,12 @@ export default function (options) {
     const hlsBreakOnNonKeyFrames = browser.iOS || browser.osx || browser.edge || !canPlayNativeHls();
     let enableFmp4Hls = userSettings.preferFmp4HlsContainer();
     if ((browser.safari || browser.tizen || browser.web0s) && !canPlayNativeHlsInFmp4()) {
+        enableFmp4Hls = false;
+    }
+
+    // fMP4 in Firefox 149 is largely broken due to bad moof::traf::tfdt handling
+    // https://bugzilla.mozilla.org/show_bug.cgi?id=2026875
+    if (browser.firefox && browser.versionMajor == 149) {
         enableFmp4Hls = false;
     }
 
@@ -1222,9 +1207,12 @@ export default function (options) {
         vp9VideoRangeTypes += '|HDR10|HDR10Plus';
         av1VideoRangeTypes += '|HDR10|HDR10Plus';
 
-        if (browser.tizenVersion >= 3 || browser.vidaa || isWebOsWithoutDolbyVision) {
+        // LG webOS can play the HDR fallback regardless of whether the panel reports
+        // Dolby Vision support. Advertising these range types avoids unnecessary
+        // transcoding that would strip HDR10+ dynamic metadata.
+        if (allowHdrFallbackRanges(browser)) {
             // Tizen TV does not support Dolby Vision at all, but it can safely play the HDR fallback.
-            // LG TVs that don't support Dolby Vision still can play the HDR fallback without issues.
+            // LG TVs can also play the HDR fallback without issues.
             // Advertising the support so that the server doesn't have to remux.
             hevcVideoRangeTypes += '|DOVIWithHDR10|DOVIWithHDR10Plus|DOVIWithEL|DOVIWithELHDR10Plus|DOVIInvalid';
             // Although no official tools exist to create AV1+DV files yet, some of our users managed to use community tools to create such files.
@@ -1519,10 +1507,13 @@ export default function (options) {
     });
 
     if (browser.web0s && supportsDolbyVision(options)) {
-        // Disallow direct playing of DOVI media in containers not ts or mp4.
+        // Adjust DOVI container rules based on WebOS version.
+        // On WebOS 25 and newer, mp4, ts, and mkv containers are allowed.
+        // On WebOS 24 and lower, only mp4 and ts containers are allowed.
+        const allowedContainers = browser.web0sVersion >= 25 ? ['mp4', 'ts', 'mkv'] : ['mp4', 'ts'];
         profile.CodecProfiles.push({
             Type: 'Video',
-            Container: '-mp4,ts',
+            Container: '-' + allowedContainers.join(','),
             Codec: 'hevc',
             Conditions: [
                 {
@@ -1606,6 +1597,11 @@ export default function (options) {
             && subtitleBurninSetting !== 'allcomplexformats' && subtitleBurninSetting !== 'onlyimageformats') {
             profile.SubtitleProfiles.push({
                 Format: 'pgssub',
+                Method: 'External'
+            });
+            profile.SubtitleProfiles.push({
+                Format: 'vobsub',
+                Container: 'mks',
                 Method: 'External'
             });
         }

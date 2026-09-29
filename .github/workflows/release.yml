@@ -1,0 +1,49 @@
+name: Release patched Jellyfin Web
+
+on:
+  push:
+    tags:
+      - 'v*-xrl.*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          check-latest: true
+      - name: Validate matching upstream version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v12\.1-xrl\.[0-9]+$ ]] || { echo 'Expected a v12.1-xrl.N tag' >&2; exit 1; }
+          test "$(node -p 'require("./package.json").version')" = '12.1.0'
+      - run: npm ci --no-audit
+      - run: npm run lint -- src/utils/nativeHlsStallRecovery.js src/utils/nativeHlsStallRecovery.test.js src/utils/webOsPlaybackPreferences.js src/utils/webOsPlaybackPreferences.test.js src/scripts/browserDeviceProfile.js src/scripts/settings/userSettings.js src/components/playback/playbackmanager.js src/plugins/htmlVideoPlayer/plugin.js
+      - run: npm test
+      - name: Build production web bundle
+        env:
+          JELLYFIN_VERSION: ${{ github.ref_name }}
+        run: npm run build:production
+      - name: Package bundle at archive root and checksum
+        run: |
+          set -euo pipefail
+          test -f dist/index.html
+          tar -czf jellyfin-web-dist.tar.gz -C dist .
+          sha256sum jellyfin-web-dist.tar.gz > jellyfin-web-dist.tar.gz.sha256
+      - name: Publish web asset (not image)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "${GITHUB_REF_NAME}" \
+            --notes 'Patched Jellyfin Web bundle based on official v12.1; see XRL_PATCHES.md.' \
+            jellyfin-web-dist.tar.gz jellyfin-web-dist.tar.gz.sha256
