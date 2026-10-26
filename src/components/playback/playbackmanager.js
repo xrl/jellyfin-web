@@ -3862,7 +3862,6 @@ export class PlaybackManager {
             });
         }
 
-        bindMediaSegmentManager(self);
         this._skipSegment = bindSkipSegment(self);
     }
 
