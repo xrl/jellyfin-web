@@ -23,15 +23,18 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          [[ "$RELEASE_TAG" =~ ^v12\.1-xrl\.[0-9]+$ ]] || { echo 'Expected a v12.1-xrl.N tag' >&2; exit 1; }
-          test "$(node -p 'require("./package.json").version')" = '12.1.0'
+          [[ "$RELEASE_TAG" =~ ^v12\.3-xrl\.[0-9]+$ ]] || { echo 'Expected a v12.3-xrl.N tag' >&2; exit 1; }
+          test "$(node -p 'require("./package.json").version')" = '12.3.0'
       - run: npm ci --no-audit
       - run: npm run lint -- src/utils/nativeHlsStallRecovery.js src/utils/nativeHlsStallRecovery.test.js src/utils/webOsPlaybackPreferences.js src/utils/webOsPlaybackPreferences.test.js src/scripts/browserDeviceProfile.js src/scripts/settings/userSettings.js src/components/playback/playbackmanager.js src/plugins/htmlVideoPlayer/plugin.js
       - run: npm test
+      - run: npm run build:check
       - name: Build production web bundle
         env:
           JELLYFIN_VERSION: ${{ github.ref_name }}
         run: npm run build:production
+      - run: node scripts/assert-lg-bundle.cjs
+      - run: npm run escheck
       - name: Package bundle at archive root and checksum
         run: |
           set -euo pipefail
@@ -45,5 +48,5 @@ jobs:
           gh release create "${GITHUB_REF_NAME}" \
             --repo "${GITHUB_REPOSITORY}" \
             --title "${GITHUB_REF_NAME}" \
-            --notes 'Patched Jellyfin Web bundle based on official v12.1; see XRL_PATCHES.md.' \
+            --notes 'Patched Jellyfin Web bundle based on official v12.3; see XRL_PATCHES.md.' \
             jellyfin-web-dist.tar.gz jellyfin-web-dist.tar.gz.sha256
