@@ -11,5 +11,10 @@ describe('12.3 web release policy', () => {
         expect(workflow).toContain('based on official v12.3; see XRL_PATCHES.md.');
         expect(patches).toContain('tag `v12.3`');
         expect(patches).toContain('validates `v12.3-xrl.N`');
+        expect(readFileSync('.nvmrc', 'utf8').trim()).toBe('24.22.1');
+        expect(workflow).toContain('check-latest: false');
+        for (const file of ['nativeHlsStallWatchdog.js', 'nativeHlsStallWatchdog.test.js', 'nativeHlsStallWiring.test.js', 'releasePolicy.test.js']) {
+            expect(workflow).toContain(`src/utils/${file}`);
+        }
     });
 });

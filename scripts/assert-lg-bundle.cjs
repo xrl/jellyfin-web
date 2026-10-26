@@ -1,4 +1,5 @@
-// Smoke-check the emitted application chunks; source tests enforce the behavior.
+// Smoke-check emitted chunks; DTS/HDR/fMP4 tokens also occur upstream and are not
+// patch-unique. Source behavior tests are authoritative; recovery has unique markers.
 const { readFileSync, readdirSync } = require('node:fs');
 const path = require('node:path');
 
