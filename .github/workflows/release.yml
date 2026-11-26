@@ -27,12 +27,28 @@ jobs:
           test "$(node -p 'require("./package.json").version')" = '12.3.0'
       - run: npm ci --no-audit
       - run: npm run lint -- src/utils/nativeHlsStallRecovery.js src/utils/nativeHlsStallRecovery.test.js src/utils/nativeHlsStallWatchdog.js src/utils/nativeHlsStallWatchdog.test.js src/utils/nativeHlsStallWiring.test.js src/utils/webOsPlaybackPreferences.js src/utils/webOsPlaybackPreferences.test.js src/utils/releasePolicy.test.js src/scripts/browserDeviceProfile.js src/scripts/settings/userSettings.js src/components/playback/playbackmanager.js src/plugins/htmlVideoPlayer/plugin.js
+      - run: npm exec eslint -- src/xrl src/apps/legacy/controllers/itemDetails/index.js
       - run: npm test
       - run: npm run build:check
+      - name: Build and check the flag-off bundle
+        env:
+          XRL_JELLYFIN_HACKERY: '0'
+        run: |
+          set -euo pipefail
+          npm run build:production
+          node scripts/assert-lg-bundle.cjs
+          npm run escheck
+          if grep -rlF --include='*.js' 'Compatibility: AAC Stereo' dist; then
+            echo 'The compatibility choice leaked into the flag-off build' >&2
+            exit 1
+          fi
       - name: Build production web bundle
         env:
           JELLYFIN_VERSION: ${{ github.ref_name }}
-        run: npm run build:production
+          XRL_JELLYFIN_HACKERY: '1'
+        run: |
+          npm run build:production
+          grep -rlF --include='*.js' 'Compatibility: AAC Stereo' dist
       - run: node scripts/assert-lg-bundle.cjs
       - run: npm run escheck
       - name: Package bundle at archive root and checksum

@@ -36,6 +36,7 @@ import { MediaError } from 'types/mediaError';
 import { getMediaError } from 'utils/mediaError';
 import { bindSkipSegment } from './skipsegment.ts';
 import * as bitrateTest from 'utils/bitrateTest';
+import * as compatibilityAudio from 'xrl/compatibilityAudio';
 
 const UNLIMITED_ITEMS = -1;
 
@@ -501,6 +502,20 @@ async function getPlaybackInfo(player, apiClient, item, deviceProfile, mediaSour
 
     query.DeviceProfile = deviceProfile;
 
+    if (__XRL_JELLYFIN_HACKERY__ && options.compatibilityAudio) {
+        const selection = options.compatibilityAudio;
+        if (!player.isLocalPlayer || mediaSourceId !== selection.mediaSourceId) {
+            return { ErrorCode: PlaybackErrorCode.NoCompatibleStream };
+        }
+
+        const result = await compatibilityAudio.getCompatibilityPlaybackInfo(
+            query, selection, deviceProfile,
+            async playbackInfoDto => (await getMediaInfoApi(api).getPostedPlaybackInfo({ itemId, playbackInfoDto })).data,
+            apiClient.serverAddress()
+        );
+        return result || { ErrorCode: PlaybackErrorCode.NoCompatibleStream };
+    }
+
     const res = await getMediaInfoApi(api).getPostedPlaybackInfo({ itemId: itemId, playbackInfoDto: query });
     return res.data;
 }
@@ -660,6 +675,7 @@ function normalizePlayOptions(playOptions) {
 
 function truncatePlayOptions(playOptions) {
     return {
+        ...(__XRL_JELLYFIN_HACKERY__ && playOptions.compatibilityAudio ? { compatibilityAudio: playOptions.compatibilityAudio } : {}),
         aspectRatio: playOptions.aspectRatio,
         fullscreen: playOptions.fullscreen,
         mediaSourceId: playOptions.mediaSourceId,
@@ -1717,8 +1733,20 @@ export class PlaybackManager {
 
             params = params || {};
 
-            const liveStreamId = getPlayerData(player).streamInfo.liveStreamId;
-            const lastMediaInfoQuery = getPlayerData(player).streamInfo.lastMediaInfoQuery;
+            const playerData = getPlayerData(player);
+            const previousStream = playerData.streamInfo;
+            const selection = __XRL_JELLYFIN_HACKERY__ && params.AudioStreamIndex == null ? previousStream.compatibilityAudio : null;
+            if (__XRL_JELLYFIN_HACKERY__ && previousStream.compatibilityAudio && params.AllowVideoStreamCopy === false) {
+                showPlaybackInfoErrorMessage(self, 'PlaybackErrorNoCompatibleStream');
+                return;
+            }
+
+            const request = __XRL_JELLYFIN_HACKERY__ && previousStream.compatibilityAudio ? {} : null;
+            if (__XRL_JELLYFIN_HACKERY__ && request) {
+                playerData.compatibilityAudioRequest = request;
+            }
+            const liveStreamId = previousStream.liveStreamId;
+            const lastMediaInfoQuery = previousStream.lastMediaInfoQuery;
 
             const playSessionId = self.playSessionId(player);
 
@@ -1743,6 +1771,7 @@ export class PlaybackManager {
                 const currentPlayOptions = currentItem.playOptions || getDefaultPlayOptions();
 
                 const options = {
+                    ...(__XRL_JELLYFIN_HACKERY__ && selection ? { compatibilityAudio: selection } : {}),
                     maxBitrate,
                     startPosition: ticks,
                     isPlayback: true,
@@ -1755,12 +1784,20 @@ export class PlaybackManager {
                 };
 
                 getPlaybackInfo(player, apiClient, currentItem, deviceProfile, currentMediaSource.Id, liveStreamId, options).then(function (result) {
+                    if (__XRL_JELLYFIN_HACKERY__ && request && (playerData.compatibilityAudioRequest !== request
+                        || playerData.streamInfo !== previousStream)) {
+                        return;
+                    }
+
                     if (validatePlaybackInfoResult(self, result)) {
                         // Changing streams requests only the active source; keep the version availability flag.
                         result.MediaSources[0].hasAlternateVersions = currentMediaSource.hasAlternateVersions;
                         currentMediaSource = result.MediaSources[0];
 
                         const streamInfo = createStreamInfo(apiClient, currentItem.MediaType, currentItem, currentMediaSource, ticks, player);
+                        if (__XRL_JELLYFIN_HACKERY__ && selection) {
+                            streamInfo.compatibilityAudio = selection;
+                        }
                         streamInfo.fullscreen = currentPlayOptions.fullscreen;
                         streamInfo.lastMediaInfoQuery = lastMediaInfoQuery;
                         streamInfo.resetSubtitleOffset = false;
@@ -2697,7 +2734,20 @@ export class PlaybackManager {
 
                 const audioStreamIndex = playOptions.audioStreamIndex;
                 const subtitleStreamIndex = playOptions.subtitleStreamIndex;
+                const selection = __XRL_JELLYFIN_HACKERY__ ? playOptions.compatibilityAudio : null;
+                if (__XRL_JELLYFIN_HACKERY__ && selection && (
+                    !enableLocalPlaylistManagement(player)
+                    || user.Policy?.EnablePlaybackRemuxing !== true
+                    || user.Policy?.EnableVideoPlaybackTranscoding !== false
+                    || (!selection.copyAudio && user.Policy?.EnableAudioPlaybackTranscoding !== true)
+                )) {
+                    loading.hide();
+                    showPlaybackInfoErrorMessage(self, 'PlaybackErrorNoCompatibleStream');
+                    return;
+                }
+
                 const options = {
+                    ...(__XRL_JELLYFIN_HACKERY__ && selection ? { compatibilityAudio: selection } : {}),
                     aspectRatio: playOptions.aspectRatio,
                     maxBitrate,
                     startPosition,
@@ -2722,7 +2772,7 @@ export class PlaybackManager {
                 let isIdFallbackNeeded = false;
 
                 autoSetNextTracks(prevSource, mediaStreams, trackOptions, user.Configuration.RememberAudioSelections, user.Configuration.RememberSubtitleSelections);
-                if (trackOptions.DefaultAudioStreamIndex != null) {
+                if ((!__XRL_JELLYFIN_HACKERY__ || !selection) && trackOptions.DefaultAudioStreamIndex != null) {
                     options.audioStreamIndex = trackOptions.DefaultAudioStreamIndex;
                     isIdFallbackNeeded = true;
                 }
@@ -2758,6 +2808,9 @@ export class PlaybackManager {
                     const playedItem = await getItemOfMediaSource(apiClient, item, mediaSource, sourceItem);
 
                     const streamInfo = createStreamInfo(apiClient, item.MediaType, playedItem, mediaSource, startPosition, player);
+                    if (__XRL_JELLYFIN_HACKERY__ && selection) {
+                        streamInfo.compatibilityAudio = selection;
+                    }
                     streamInfo.aspectRatio = playOptions.aspectRatio;
                     streamInfo.fullscreen = playOptions.fullscreen;
 
@@ -3503,7 +3556,7 @@ export class PlaybackManager {
 
             const streamInfo = error.streamInfo || getPlayerData(player).streamInfo;
 
-            if (streamInfo?.url) {
+            if (streamInfo?.url && (!__XRL_JELLYFIN_HACKERY__ || !streamInfo.compatibilityAudio)) {
                 const isAlreadyFallbacking = streamInfo.url.toLowerCase().includes('transcodereasons');
                 const currentlyPreventsVideoStreamCopy = streamInfo.url.toLowerCase().indexOf('allowvideostreamcopy=false') !== -1;
                 const currentlyPreventsAudioStreamCopy = streamInfo.url.toLowerCase().indexOf('allowaudiostreamcopy=false') !== -1;
