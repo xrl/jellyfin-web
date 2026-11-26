@@ -74,6 +74,13 @@ describe('iPhone compatibility audio', () => {
         expect(readCompatibilityAudioSelection(select, 'version-a')).toBeNull();
     });
 
+    it('leaves folder rips to the original direct-play path', () => {
+        const select = document.createElement('select');
+        const folder = { Id: 'version-a', Protocol: 'File', VideoType: 'BluRay', MediaStreams: [video, eac3] };
+        addCompatibilityAudioOptions(select, folder, [eac3]);
+        expect(select.options).toHaveLength(0);
+    });
+
     it('permits passthrough only for known AAC-LC stereo', () => {
         const select = createAudioMenu([{ ...commentary, Profile: 'LC' }]);
         select.selectedIndex = 1;

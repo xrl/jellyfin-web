@@ -1785,7 +1785,7 @@ export class PlaybackManager {
 
                 getPlaybackInfo(player, apiClient, currentItem, deviceProfile, currentMediaSource.Id, liveStreamId, options).then(function (result) {
                     if (__XRL_JELLYFIN_HACKERY__ && request && (playerData.compatibilityAudioRequest !== request
-                        || playerData.streamInfo !== previousStream)) {
+                        || playerData.streamInfo !== previousStream || previousStream.ended)) {
                         return;
                     }
 

@@ -7,6 +7,7 @@ export function isCompatibilityAudioClient(browser, appName, nativeShell) {
 
 function compatibilityAudioOptions(mediaSource, tracks) {
     if (!mediaSource?.Id || mediaSource.Protocol !== 'File' || mediaSource.IsRemote || mediaSource.RequiresOpening
+        || (mediaSource.VideoType && mediaSource.VideoType !== 'VideoFile')
         || !mediaSource.MediaStreams.some(stream => stream.Type === 'Video' && ['h264', 'hevc'].includes(stream.Codec))) {
         return [];
     }
