@@ -7,6 +7,7 @@ import {
 } from './compatibilityAudio';
 
 const profile = {
+    DirectPlayProfiles: [{ Type: 'Video', Container: 'mp4', AudioCodec: 'aac' }],
     TranscodingProfiles: [
         { Type: 'Video', Context: 'Streaming', Container: 'mp4', Protocol: 'http', AudioCodec: 'eac3,aac' },
         { Type: 'Video', Context: 'Streaming', Container: 'mp4', Protocol: 'hls', AudioCodec: 'aac,mp3', MaxAudioChannels: '6', VideoCodec: 'h264' }
@@ -36,7 +37,7 @@ function playbackSource(overrides = {}) {
         SupportsDirectPlay: false,
         TranscodingContainer: 'mp4',
         TranscodingSubProtocol: 'hls',
-        TranscodingUrl: '/Videos/item/master.m3u8?AudioCodec=aac&TranscodingMaxAudioChannels=2&AllowAudioStreamCopy=false',
+        TranscodingUrl: '/Videos/item/master.m3u8?AudioCodec=aac&SegmentContainer=mp4&AudioStreamIndex=2&TranscodingMaxAudioChannels=2&AllowAudioStreamCopy=false',
         ...overrides
     };
 }
@@ -95,12 +96,13 @@ describe('iPhone compatibility audio', () => {
             MediaSourceId: 'version-a',
             MaxAudioChannels: 2,
             EnableDirectPlay: false,
-            EnableDirectStream: false,
+            EnableDirectStream: true,
             EnableTranscoding: true,
             AllowVideoStreamCopy: true,
             AllowAudioStreamCopy: false,
             AlwaysBurnInSubtitleWhenTranscoding: false,
             DeviceProfile: {
+                DirectPlayProfiles: [],
                 TranscodingProfiles: [{ ...profile.TranscodingProfiles[1], AudioCodec: 'aac', MaxAudioChannels: '2' }]
             }
         });
@@ -109,9 +111,10 @@ describe('iPhone compatibility audio', () => {
 
     it.each([
         { DefaultAudioStreamIndex: 1 },
+        { TranscodingUrl: '/Videos/item/master.m3u8?AudioCodec=aac&SegmentContainer=mp4&AudioStreamIndex=1&TranscodingMaxAudioChannels=2&AllowAudioStreamCopy=false' },
         { TranscodingSubProtocol: 'http' },
         { SupportsDirectPlay: true },
-        { TranscodingUrl: '/Videos/item/master.m3u8?AudioCodec=aac&TranscodingMaxAudioChannels=2' }
+        { TranscodingUrl: '/Videos/item/master.m3u8?AudioCodec=aac&SegmentContainer=mp4&AudioStreamIndex=2&TranscodingMaxAudioChannels=2' }
     ])('rejects incompatible server responses instead of letting native playback fall back', async overrides => {
         const getInfo = vi.fn().mockResolvedValue({ MediaSources: [playbackSource(overrides)] });
         const selection = { mediaSourceId: 'version-a', audioStreamIndex: 2, copyAudio: false };

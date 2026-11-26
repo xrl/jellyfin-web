@@ -61,7 +61,9 @@ function compatibilityPlaybackQuery(query, selection, deviceProfile) {
         MediaSourceId: selection.mediaSourceId,
         AudioStreamIndex: selection.audioStreamIndex,
         EnableDirectPlay: false,
-        EnableDirectStream: false,
+        // In 12.3 this preserves remux eligibility when video encoding is disabled.
+        // The empty direct-play profile and response checks keep this on HLS.
+        EnableDirectStream: true,
         EnableTranscoding: true,
         AllowVideoStreamCopy: true,
         AllowAudioStreamCopy: selection.copyAudio,
@@ -69,6 +71,7 @@ function compatibilityPlaybackQuery(query, selection, deviceProfile) {
         AlwaysBurnInSubtitleWhenTranscoding: false,
         DeviceProfile: {
             ...deviceProfile,
+            DirectPlayProfiles: [],
             TranscodingProfiles: [{ ...videoProfile, AudioCodec: 'aac', MaxAudioChannels: '2' }]
         }
     };
@@ -84,6 +87,8 @@ function validateCompatibilitySource(source, selection, baseUrl) {
     const url = new URL(source.TranscodingUrl, baseUrl);
     const params = new URLSearchParams([...url.searchParams].map(([key, value]) => [key.toLowerCase(), value]));
     return url.pathname.endsWith('.m3u8') && params.get('audiocodec') === 'aac'
+        && params.get('segmentcontainer') === 'mp4'
+        && params.get('audiostreamindex') === String(selection.audioStreamIndex)
         && params.get('transcodingmaxaudiochannels') === '2'
         && (selection.copyAudio || params.get('allowaudiostreamcopy') === 'false');
 }
