@@ -225,6 +225,7 @@ export default tseslint.config(
                 'LibraryMenu': true,
                 'Windows': false,
                 // Build time definitions
+                __XRL_JELLYFIN_HACKERY__: false,
                 __COMMIT_SHA__: false,
                 __JF_BUILD_VERSION__: false,
                 __PACKAGE_JSON_NAME__: false,

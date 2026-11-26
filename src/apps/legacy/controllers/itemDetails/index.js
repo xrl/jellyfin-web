@@ -31,6 +31,7 @@ import { ItemAction } from 'constants/itemAction';
 import globalize from 'lib/globalize';
 import { ServerConnections } from 'lib/jellyfin-apiclient';
 import browser from 'scripts/browser';
+import * as compatibilityAudio from 'xrl/compatibilityAudio';
 import datetime from 'scripts/datetime';
 import dom from 'utils/dom';
 import { renderComponent } from 'utils/reactUtils';
@@ -282,7 +283,11 @@ function renderAudioSelections(page, mediaSources) {
         return `<option value="${v.Index}" ${selected}>${escapeHtml(v.DisplayTitle)}</option>`;
     }).join('');
 
-    if (tracks.length > 1) {
+    if (__XRL_JELLYFIN_HACKERY__ && compatibilityAudio.isCompatibilityAudioClient(browser, appHost.appName(), window.NativeShell)) {
+        compatibilityAudio.addCompatibilityAudioOptions(select, mediaSource, tracks);
+    }
+
+    if (select.options.length > 1) {
         select.removeAttribute('disabled');
     } else {
         select.setAttribute('disabled', 'disabled');
@@ -1961,11 +1966,18 @@ export default function (view, params) {
     }
 
     function getPlayOptions(startPosition) {
-        const audioStreamIndex = view.querySelector('.selectAudio').value || null;
+        const audioSelect = view.querySelector('.selectAudio');
+        const mediaSourceId = view.querySelector('.selectSource').value;
+        const selection = __XRL_JELLYFIN_HACKERY__ ?
+            compatibilityAudio.readCompatibilityAudioSelection(audioSelect, mediaSourceId) :
+            null;
         return {
+            ...(__XRL_JELLYFIN_HACKERY__ && selection ? { compatibilityAudio: selection } : {}),
             startPositionTicks: startPosition,
-            mediaSourceId: view.querySelector('.selectSource').value,
-            audioStreamIndex: audioStreamIndex,
+            mediaSourceId,
+            audioStreamIndex: (__XRL_JELLYFIN_HACKERY__ && audioSelect.options[audioSelect.selectedIndex]?.dataset.compatibilityAudio) ?
+                (selection?.audioStreamIndex ?? null) :
+                (audioSelect.value || null),
             subtitleStreamIndex: view.querySelector('.selectSubtitles').value
         };
     }

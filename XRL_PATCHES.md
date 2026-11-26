@@ -11,6 +11,12 @@ This source merge preserves the four deployed behaviors from `085d3c1b5fc9b011fb
 
 The ineffective `enableMkvProgressive` experiment is not carried. The new upstream webOS-25 MKV rule remains intact. These are source behaviors, **not** evidence of successful LG playback or production migration.
 
+## Optional iPhone compatibility audio
+
+Set `XRL_JELLYFIN_HACKERY=1` when building to include **Compatibility: AAC Stereo** in the official Jellyfin iPhone app's title-page audio dropdown. Play or Resume with that choice requests HLS using the selected original track and keeps the video as a copy. The stock-server path requires remux permission, audio conversion permission where applicable, and an account with video encoding disabled. Choose an original track to use ordinary negotiation.
+
+Local builds default to `0`. The release workflow checks both flag settings, and the disabled bundle excludes the optional iPhone module. The LG webOS patches are independent of this build setting.
+
 ## Release ritual (future, requires separate authorization)
 
 On the exact tested release commit, use the `.nvmrc` Node 24/npm 11 toolchain and upstream lockfile; run `npm ci --no-audit`, lint, tests, and `npm run build:production`, then `node scripts/assert-lg-bundle.cjs` and `npm run escheck` (plus TypeScript checks). The bundle check only verifies patch markers; the source tests verify behavior. The tag-triggered release workflow validates `v12.3-xrl.N`, tests, builds `dist/` with unique `JELLYFIN_VERSION`, archives the *contents* at the tar root and publishes asset plus SHA-256. Publishing a tag triggers release: **do not tag or push until reviewed and approved**. Only after inspecting the released asset and checksum should the separately reviewed image recipe consume it with the official server `12.3` base, pin/verify actual ARM64 digest and inspect runtime/FFmpeg/assets. Never infer runtime patch level from project target framework.

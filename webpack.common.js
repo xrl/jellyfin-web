@@ -20,6 +20,11 @@ const Assets = [
 ];
 
 const DEV_MODE = process.env.NODE_ENV !== 'production';
+const hackeryFlag = process.env.XRL_JELLYFIN_HACKERY ?? '0';
+if (hackeryFlag !== '0' && hackeryFlag !== '1') {
+    throw new Error('XRL_JELLYFIN_HACKERY must be 0 or 1');
+}
+const enableXrlHackery = hackeryFlag === '1';
 let COMMIT_SHA = '';
 try {
     COMMIT_SHA = require('child_process')
@@ -47,6 +52,7 @@ const config = {
         ...THEMES_BY_ID
     },
     resolve: {
+        alias: enableXrlHackery ? {} : { 'xrl/compatibilityAudio$': false },
         extensions: ['.tsx', '.ts', '.js'],
         modules: [
             path.resolve(__dirname, 'src'),
@@ -55,6 +61,7 @@ const config = {
     },
     plugins: [
         new DefinePlugin({
+            __XRL_JELLYFIN_HACKERY__: enableXrlHackery,
             __COMMIT_SHA__: JSON.stringify(COMMIT_SHA),
             __JF_BUILD_VERSION__: JSON.stringify(
                 process.env.WEBPACK_SERVE ?
