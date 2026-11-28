@@ -10,6 +10,7 @@ import { loadRecordings } from './sections/activeRecordings';
 import { loadLibraryButtons } from './sections/libraryButtons';
 import { loadLibraryTiles } from './sections/libraryTiles';
 import { loadLiveTV } from './sections/liveTv';
+import { loadNewReleases } from './sections/newReleases';
 import { loadNextUp } from './sections/nextUp';
 import { loadRecentlyAdded } from './sections/recentlyAdded';
 import { loadResume } from './sections/resume';
@@ -22,7 +23,6 @@ import 'elements/emby-button/emby-button';
 import './homesections.scss';
 
 const MAX_SECTIONS = 10;
-const MAX_SECTIONS_TV = MAX_SECTIONS + 1; // TV layout can have an extra section to ensure a library section is always visible
 
 export function getDefaultSection(index) {
     if (index < 0 || index > DEFAULT_SECTIONS.length) return '';
@@ -65,16 +65,18 @@ export function loadSections(elem, apiClient, user, userSettings) {
             let html = '';
 
             if (userViews.length) {
-                // TV layout can have an extra section to ensure libraries are visible
-                const totalSectionCount = layoutManager.tv ? MAX_SECTIONS_TV : MAX_SECTIONS;
-                for (let i = 0; i < totalSectionCount; i++) {
+                const sections = getAllSectionsToShow(userSettings);
+                const latestMediaIndex = sections.indexOf(HomeSectionType.LatestMedia);
+                sections.splice(latestMediaIndex < 0 ? sections.length : latestMediaIndex, 0, HomeSectionType.NewReleases);
+
+                for (let i = 0; i < sections.length; i++) {
                     html += '<div class="verticalSection section' + i + '"></div>';
                 }
 
                 elem.innerHTML = html;
                 elem.classList.add('homeSectionsContainer');
 
-                const promises = getAllSectionsToShow(userSettings)
+                const promises = sections
                     .map((section, index) => (
                         loadSection(elem, apiClient, user, userSettings, userViews, section, index)
                     ));
@@ -148,6 +150,9 @@ function loadSection(page, apiClient, user, userSettings, userViews, section, in
             break;
         case HomeSectionType.LatestMedia:
             loadRecentlyAdded(elem, apiClient, user, userViews, options);
+            break;
+        case HomeSectionType.NewReleases:
+            loadNewReleases(elem, apiClient, options);
             break;
         case HomeSectionType.LibraryButtons:
             loadLibraryButtons(elem, userViews);

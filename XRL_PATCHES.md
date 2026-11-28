@@ -11,6 +11,8 @@ This source merge preserves the four deployed behaviors from `085d3c1b5fc9b011fb
 
 The ineffective `enableMkvProgressive` experiment is not carried. The new upstream webOS-25 MKV rule remains intact. These are source behaviors, **not** evidence of successful LG playback or production migration.
 
+From v12.3-xrl.3, Home also shows New Releases for unwatched movies with premiere dates in the last 60 days. The row uses the signed-in viewer's library access and watch state and is hidden when empty.
+
 ## Release ritual (future, requires separate authorization)
 
 On the exact tested release commit, use the `.nvmrc` Node 24/npm 11 toolchain and upstream lockfile; run `npm ci --no-audit`, lint, tests, and `npm run build:production`, then `node scripts/assert-lg-bundle.cjs` and `npm run escheck` (plus TypeScript checks). The bundle check only verifies patch markers; the source tests verify behavior. The tag-triggered release workflow validates `v12.3-xrl.N`, tests, builds `dist/` with unique `JELLYFIN_VERSION`, archives the *contents* at the tar root and publishes asset plus SHA-256. Publishing a tag triggers release: **do not tag or push until reviewed and approved**. Only after inspecting the released asset and checksum should the separately reviewed image recipe consume it with the official server `12.3` base, pin/verify actual ARM64 digest and inspect runtime/FFmpeg/assets. Never infer runtime patch level from project target framework.

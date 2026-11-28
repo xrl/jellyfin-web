@@ -8,6 +8,7 @@ export enum HomeSectionType {
     Resume = 'resume',
     ResumeAudio = 'resumeaudio',
     LatestMedia = 'latestmedia',
+    NewReleases = 'newreleases',
     NextUp = 'nextup',
     LiveTv = 'livetv',
     ResumeBook = 'resumebook'
