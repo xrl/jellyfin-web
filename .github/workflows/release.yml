@@ -27,6 +27,7 @@ jobs:
           test "$(node -p 'require("./package.json").version')" = '12.3.0'
       - run: npm ci --no-audit
       - run: npm run lint -- src/utils/nativeHlsStallRecovery.js src/utils/nativeHlsStallRecovery.test.js src/utils/nativeHlsStallWatchdog.js src/utils/nativeHlsStallWatchdog.test.js src/utils/nativeHlsStallWiring.test.js src/utils/webOsPlaybackPreferences.js src/utils/webOsPlaybackPreferences.test.js src/utils/releasePolicy.test.js src/scripts/browserDeviceProfile.js src/scripts/settings/userSettings.js src/components/playback/playbackmanager.js src/plugins/htmlVideoPlayer/plugin.js
+      - run: npm run lint -- src/components/homesections/homesections.js src/components/homesections/sections/newReleases.ts src/components/homesections/sections/newReleases.test.ts src/constants/homeSectionType.ts
       - run: npm test
       - run: npm run build:check
       - name: Build production web bundle
